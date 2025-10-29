@@ -126,6 +126,215 @@ This will use the `get_project_details` tool.
 
 This will use the `search_recent_awards` tool.
 
+## Using with Azure OpenAI Responses API
+
+You can integrate this MCP server with Azure OpenAI's Responses API using function calling. Here are snippets showing how to define the tools in different languages:
+
+### Python
+
+```python
+from openai import AzureOpenAI
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+
+# Configure Azure AD authentication
+token_provider = get_bearer_token_provider(
+    DefaultAzureCredential(),
+    "https://cognitiveservices.azure.com/.default"
+)
+
+client = AzureOpenAI(
+    base_url="https://YOUR-RESOURCE-NAME.openai.azure.com/openai/v1/",
+    azure_ad_token_provider=token_provider,
+    api_version="preview"
+)
+
+# Define NIH Reporter search tool
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "search_projects",
+            "description": "Search for NIH-funded research projects using multiple criteria including fiscal years, agencies, activity codes, and keywords",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "fiscal_years": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Fiscal years to search (e.g., [2024, 2025])"
+                    },
+                    "agencies": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "NIH Institute/Center codes (e.g., ['NCI', 'NHLBI'])"
+                    },
+                    "activity_codes": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Grant activity codes (e.g., ['R01', 'K99'])"
+                    },
+                    "pi_names": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Principal investigator names"
+                    },
+                    "keywords": {
+                        "type": "string",
+                        "description": "Search keywords for project titles/abstracts"
+                    }
+                }
+            }
+        }
+    }
+]
+
+response = client.responses.create(
+    model="gpt-4.1",
+    tools=tools,
+    input="What recent NIH projects were targeted at early career researchers?"
+)
+
+print(response.output_text)
+```
+
+### C#
+
+```csharp
+using Azure.AI.OpenAI;
+using Azure.Identity;
+
+var credential = new DefaultAzureCredential();
+var client = new AzureOpenAIClient(
+    new Uri("https://YOUR-RESOURCE-NAME.openai.azure.com/"),
+    credential
+);
+
+var tools = new[]
+{
+    new
+    {
+        type = "function",
+        function = new
+        {
+            name = "search_projects",
+            description = "Search for NIH-funded research projects using multiple criteria",
+            parameters = new
+            {
+                type = "object",
+                properties = new
+                {
+                    fiscal_years = new
+                    {
+                        type = "array",
+                        items = new { type = "integer" },
+                        description = "Fiscal years to search (e.g., [2024, 2025])"
+                    },
+                    agencies = new
+                    {
+                        type = "array",
+                        items = new { type = "string" },
+                        description = "NIH Institute/Center codes (e.g., ['NCI', 'NHLBI'])"
+                    },
+                    activity_codes = new
+                    {
+                        type = "array",
+                        items = new { type = "string" },
+                        description = "Grant activity codes (e.g., ['R01', 'K99'])"
+                    },
+                    keywords = new
+                    {
+                        type = "string",
+                        description = "Search keywords for project titles/abstracts"
+                    }
+                }
+            }
+        }
+    }
+};
+
+var response = await client.GetResponsesClient("gpt-4.1").CreateAsync(new()
+{
+    Tools = tools,
+    Input = "What recent NIH projects were targeted at early career researchers?"
+});
+
+Console.WriteLine(response.Value.OutputText);
+```
+
+### PHP
+
+```php
+<?php
+require 'vendor/autoload.php';
+
+use OpenAI\Azure\Client;
+
+$client = Client::factory()
+    ->withBaseUri('https://YOUR-RESOURCE-NAME.openai.azure.com/openai/v1/')
+    ->withAzureAdToken(getAzureAdToken())
+    ->withApiVersion('preview')
+    ->make();
+
+$tools = [
+    [
+        'type' => 'function',
+        'function' => [
+            'name' => 'search_projects',
+            'description' => 'Search for NIH-funded research projects using multiple criteria',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'fiscal_years' => [
+                        'type' => 'array',
+                        'items' => ['type' => 'integer'],
+                        'description' => 'Fiscal years to search'
+                    ],
+                    'agencies' => [
+                        'type' => 'array',
+                        'items' => ['type' => 'string'],
+                        'description' => 'NIH Institute/Center codes'
+                    ],
+                    'activity_codes' => [
+                        'type' => 'array',
+                        'items' => ['type' => 'string'],
+                        'description' => 'Grant activity codes'
+                    ],
+                    'keywords' => [
+                        'type' => 'string',
+                        'description' => 'Search keywords'
+                    ]
+                ]
+            ]
+        ]
+    ]
+];
+
+$response = $client->responses()->create([
+    'model' => 'gpt-4.1',
+    'tools' => $tools,
+    'input' => 'What recent NIH projects were targeted at early career researchers?'
+]);
+
+echo $response['output_text'];
+?>
+```
+
+**Integration Notes:**
+
+To connect these tools to your MCP server backend:
+1. Start the Docker container: `docker run -i --rm nih-reporter-mcp`
+2. When Azure OpenAI calls your function, intercept the function call
+3. Send the corresponding MCP protocol message via stdin to the Docker container
+4. Parse the JSON-RPC response from stdout
+5. Return the results to Azure OpenAI to generate the final response
+
+**Available Tools:**
+- `search_projects` - Search with multiple criteria
+- `get_project_details` - Get details by project number
+- `search_recent_awards` - Find recent awards by days
+- `search_by_investigator` - Search by PI name
+- `get_spending_categories` - Get NIH spending categories
+
 ## API Reference
 
 ### NIH Institute/Center Codes
