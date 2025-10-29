@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  nih-reporter-mcp:
+    build: .
+    container_name: nih-reporter-mcp-server
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+    # For MCP, we typically use stdio, so no ports are exposed
+    # The server communicates via stdin/stdout

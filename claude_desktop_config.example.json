@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "nih-reporter": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "nih-reporter-mcp"]
+    }
+  }
+}
